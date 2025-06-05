@@ -5,7 +5,7 @@
 exec wish8.6 "$0" "$@"
 
 global lmdexplorer_version
-set lmdexplorer_version "lmdExplorer version 0.40 2025-05-30 08:05" 
+set lmdexplorer_version "lmdExplorer version 0.403 2025-06-04 20:37" 
 set briefconsole 1
 
 # Copyright (C) 2019-2025 Seymour Shlien
@@ -1020,6 +1020,7 @@ $ww add command -label "root directory" -font $df -command {
     if {[info exist desc]} {unset desc}
     lmdInit
     }
+$ww add command -label "search for title" -font $df -command searchNameWindow
 $ww add command -label "reload last midi file" -font $df -command load_last_midi_file -accelerator "ctrl-m"
 
 $ww add cascade -label "recent" -font $df -menu $ww.recent
@@ -1035,7 +1036,7 @@ $ww add command -label "help" -font $df -command {show_message_page $hlp_filemen
 menu .lmdfeatures.menuline.file.items.recent -tearoff 0
 for {set i 0} {$i < $midi(history_length)} {incr i} {
     $ww.recent add radiobutton  -label $midi(history$i) \
-       -value $i -variable history_index -command "open_recent_folder [list $midi(history$i)]" -font $df
+       -value $i -variable history_index -command "lmdInfo [list $midi(history$i)]" -font $df
 }
 
 
@@ -1317,12 +1318,6 @@ tooltip::tooltip $w.menuline.abc "Convert the selected tracks (channels) or enti
 button $w.menuline.display -text display -font $df -command {create_abc_file none "display"} -state disabled
 
 tooltip::tooltip .lmdfeatures.menuline.display "Display the music notation of the selected channels or tracks"
-#        find title 
-button .lmdfeatures.menuline2.jump -text find -command {findChildInTree .lmdfeatures $findname} -font $df
-
-entry .lmdfeatures.menuline2.name -width 16 -textvariable findname -font $df
-
-bind .lmdfeatures.menuline2.name <Return> {findChildInTree .lmdfeatures $findname}
 
 button .lmdfeatures.menuline2.random -text "random pick" -font $df -command {randomPick .lmdfeatures}
 
@@ -1336,14 +1331,6 @@ scale .lmdfeatures.menuline2.speed -length 100 -from 0.1 -to 3.0 -orient horizon
  -resolution 0.05 -width 10 -variable midispeed -font $df
 set midispeed 1.0
 label .lmdfeatures.menuline2.speedlabel -text speed -font $df -relief flat -pady 1
-
-
-tooltip::tooltip .lmdfeatures.menuline2.jump "If you know the name of a subfolder
-in this directory, it may be more practical
-to jump to this location rather than scrolling
-down. Enter the name or first few letters in the
-entry box followed by a return."
-
 
 
 #        main help button
@@ -1411,7 +1398,7 @@ is still exposed when you exit midiexplorer.
 # pack everything and set binding to quick keys
 set ww $w.menuline
 pack $ww.file  $ww.view $ww.play $ww.display $ww.rhythm $ww.pitch  $ww.database $ww.abc $ww.settings $ww.internals $ww.help -anchor w -side left
-pack .lmdfeatures.menuline2.jump .lmdfeatures.menuline2.name .lmdfeatures.menuline2.random  .lmdfeatures.menuline2.transpose .lmdfeatures.menuline2.semi .lmdfeatures.menuline2.speed .lmdfeatures.menuline2.speedlabel -side left
+pack  .lmdfeatures.menuline2.random  .lmdfeatures.menuline2.transpose .lmdfeatures.menuline2.semi .lmdfeatures.menuline2.speed .lmdfeatures.menuline2.speedlabel -side left
 pack .lmdfeatures.menuline -anchor w
 pack .lmdfeatures.menuline2 -anchor w
 
@@ -1561,6 +1548,7 @@ proc cfgtooltips {} {
 cfgtooltips
 
 proc updateHistory {openfile} {
+    #puts "updateHistory $openfile"
     global midi history_index df
     set w .lmdfeatures.menuline.file.items.recent
     #check if file is in history
@@ -1570,7 +1558,7 @@ proc updateHistory {openfile} {
     
     if {$midi(history_length) == 0}  {
         $w add radiobutton  -value 0 -font $df\
-                -variable history_index -command "open_recent_folder [list $openfile]"
+                -variable history_index -command "lmdInfo [list $openfile]"
     }
     
     # push history down open stack
@@ -1581,7 +1569,7 @@ proc updateHistory {openfile} {
         if {$midi(history_length) < 10 && $i == $midi(history_length) } {
             $w add radiobutton  -label $midi(history$i) \
                     -value $i -variable history_index\
-                    -font $df -command "open_recent_folder [list $openfile]"
+                    -font $df -command "lmdInfo [list $openfile]"
         } else {
             $w entryconfigure  $k -label $midi(history$j)
         }
@@ -1684,24 +1672,10 @@ set stopScan 0
 }
 
 
-proc findChildInTree {w name} {
-# in case the root folder is not there
-restore_root_folder 
-#puts "searching for $name"
-set nodes [$w.tree children [$w.tree children {}]]
-foreach node $nodes {
- set c [$w.tree item $node -value]
- set n [file tail [lindex $c 0]]
- set n [string tolower $n]
- set na [string tolower $name]
- if {[string first $na $n] == 0} {$w.tree see $node
-                                  break}
- }
-}
-
 proc randomPick {w} {
 # in case the root folder is not there
 set chosenMidi [choose_randomMidi]
+#puts "randomPick chosenMidi = $chosenMidi"
 lmdInfo $chosenMidi
 }
 
@@ -2106,11 +2080,6 @@ for {set i 1} {$i < 17} {incr i} {
 }
 
 
-proc open_recent_folder {recent_folder} {
-findChildInTree .lmdfeatures [file tail $recent_folder]
-}
-
-
 #   Part 6.0 Midi file selection support
 
 proc activate_menu_items {} {
@@ -2140,7 +2109,7 @@ proc selected_midi {chosenMidi} {
  if {$extension == ".mid"} {  
    activate_menu_items
    set midi(midifilein) $f
-   updateHistory [file dirname $f]
+   updateHistory  $f
    clearMidiTracksAndChannels
    set midi_info [get_midi_info_for]
    parse_midi_info $midi_info
@@ -11418,11 +11387,6 @@ checkbutton $w.checklyrics -variable searchstate(lyrics)
 label $w.haslyrics -text "has lyrics" -font $df
 grid $w.checklyrics $w.haslyrics
 
-checkbutton $w.checkname -variable searchstate(cname) -command searchname
-label $w.labname -text "string in file name" -font $df 
-entry $w.name -textvariable midi(sname) -width 16 -font $df -state disabled
-grid $w.checkname $w.labname $w.name -sticky nsew
-
 
 set state {{cname sname} {ctempo tempo} {checkprogs proglist} {cbends nbends} {cndrums ndrums} {cpcol pcolthr} {cpitch pitchthr} {cpitche pitche}}
 
@@ -11488,7 +11452,6 @@ matchprogs
 
 
 proc enable_disable_search_entries {} {
-  searchname
   searchprogs
   matchprogs
   searchperc
@@ -11497,17 +11460,6 @@ proc enable_disable_search_entries {} {
   searchpitch
   }
   
-
-
-proc searchname {} {
-global sname
-global searchstate
-if {$searchstate(cname)} {
-   .searchbox.name configure -state normal
-   } else {
-   .searchbox.name configure -state disabled
-   }
-}
 
 proc searchtempo {} {
 global searchstate
@@ -11620,7 +11572,6 @@ if {$searchstate(cpitche)} {
 }
 
 set keysearch Cmaj
-set filter_code(cname) "if \{\[match_title \$item\] < 0\} \{return 0\}"
 set filter_code(ctempo) "if \{\[match_tempo \$item\] == -1\} \{return 0\}"
 set filter_code(checkprogs) "if \{\[dict exists \$desc(\$item) progs] && \[list_in_list \$midi(proglist) \[dict get \$desc(\$item) progs\]\] == 0\} \{return 0\}"
 set filter_code(checkperc) "if \{\[list_in_list \$midi(drumlist) \[dict get \$desc(\$item) drums\]\] == 0\} \{return 0\}"
@@ -11666,9 +11617,6 @@ proc describe_filter {} {
 global searchstate
 global midi
 appendInfoMessage "Searching for midi files which satisfy all of these conditions."
-if {$searchstate(cname)} {
-  appendInfoMessage "The file name contains the string '$midi(sname)'\n"
-  }
 if {$searchstate(ctempo)} {
   appendInfoMessage "The tempo lies between [expr $midi(tempo) -10] and [expr $midi(tempo) + 10]  beats/minute."
   }
@@ -11768,7 +11716,7 @@ append revised_procedure "if \{\[dict exists \$desc(\$item) damaged\]\} \{return
 
 
 set i 0
-foreach item {cname ctempo checkprogs checkperc checkexclude cbends cndrums cpcol cpitch  cpitche cprog1 cprog2 lyrics keysig} {
+foreach item {ctempo checkprogs checkperc checkexclude cbends cndrums cpcol cpitch  cpitche cprog1 cprog2 lyrics keysig} {
   if {$searchstate($item) > 0} {
      append revised_procedure "\n$filter_code($item)"
      incr i
@@ -12093,14 +12041,6 @@ set maxdrums [expr $midi(ndrums) + 1]
 set ndrums [llength [dict get $desc($item) drums]]
 if {$ndrums < $mindrums || $ndrums > $maxdrums} {return -1}
 return 1
-}
-
-proc match_title {item} {
-global desc
-global midi
-set needle [string tolower $midi(sname)]
-set haystack [string tolower [dict get $desc($item) file]]
-return [string first $needle $haystack]
 }
 
 
@@ -17139,6 +17079,123 @@ close $inhandle
 close $outhandle
 }
 
+
+proc search_md5_to_paths {needle} {
+global midi
+global midicapsPosition
+set FindQuoted {"([^""]*)"}
+set needle [string tolower $needle]
+set inhandle [open [file join $midi(rootfolder) lmd_full "md5_to_paths.json"] "r"]
+set i 0
+set done 0
+while {![eof $inhandle]} {
+  set line [gets $inhandle]
+  if {[string first ": \[" $line] > 4} {
+    regexp $FindQuoted $line inFileName
+#ensure that inFileName is also in the midicapsPosition dictionary
+    set fullFileName [addprefix_to_chosenfile $inFileName]
+    if {[dict exists $midicapsPosition $fullFileName]} {set done 0}
+    } else {
+    regexp -all $FindQuoted $line haystack
+    if {$done == 0 &&[info exist haystack] && ([string first $needle [string tolower $haystack]] > 1)} {
+       #puts "inFileName = $inFileName haystack = $haystack"
+       .searchName.tree insert {} -1 -values [list $inFileName  $haystack]
+       incr i
+       }
+       set done 1
+       #if {$i > 1000} break
+       }
+  }
+#puts "adding $i file links"
+.searchName.status configure -text "found $i files"
+close $inhandle 
+}
+
+proc scan_md5_database {} {
+global midi
+
+set itemlist  [.searchName.tree children {}]
+#set itemlist [$w.tree children [$w.tree children {}]]
+if {[llength $itemlist] > 0} {
+  .searchName.tree delete $itemlist
+  }
+#puts "scanning $midi(searchstring)"
+.searchName.status configure -text "searching"
+update
+search_md5_to_paths $midi(searchstring)
+}
+
+set hlp_searchName "Search string in Name\n\n
+This function searches for the file in the lmd_full collection\
+listed in the md5_to_paths.json for the file which has the given\
+substring. The md5_to_paths.json is part of the lmd_full collection and\
+contains the original file name corresponding to the md5 name.\
+In some cases the same md5 file may have multiple origins.
+
+Enter a substring that you think may be present in the file\
+name. Examples you can try are: mozart, beatles, lennon, ...\
+The matching is done independent of the upper and lower case\
+characters. If you get thousands of matches, then you should\
+lengthen the search string. If you get too few, then you may\
+wish to try a simpler string.
+
+Click the scan button or press enter in the entry box to start\
+the seach.
+
+The results are shown in the list below. The left column is the\
+actual file name and the right column is the name in the json file\
+that contains that string. Selecting one of those lines in the\
+listbox will automatically open that file.
+"
+ 
+
+proc searchNameWindow {} {
+global df
+global midi
+if {![winfo exist .searchName]} {
+  toplevel .searchName
+  set w .searchName.f 
+  frame $w 
+  label $w.lab -text "Search String" -font $df
+  entry $w.ent -width 16 -font $df -relief sunken -textvariable midi(searchstring)
+  button $w.scan -text scan -font $df -command {scan_md5_database}
+  button $w.help -text help -font $df -command {show_message_page $hlp_searchName w}
+  pack $w -side top
+  pack $w.lab $w.ent $w.scan $w.help -side left
+  set w .searchName
+  label .searchName.status -font $df -text ""
+  pack .searchName.status
+  #frame $w
+  ttk::scrollbar $w.vsb -orient vertical -command "$w.tree yview"
+  ttk::treeview $w.tree -columns {filename original}\
+      -height 10 -yscroll "$w.vsb set"
+  $w.tree column \#0 -width 1
+  $w.tree column filename -width 200
+  $w.tree column original -width 300
+  pack $w.tree $w.vsb -side left  -fill both
+  bind $w.tree <<TreeviewSelect>> {sinfoSelect}
+  bind $w.f.ent <Return> "search_md5_to_paths Queda"
+  }
+return
+}
+
+proc sinfoSelect {} {
+global midi
+set indices [.searchName.tree selection]
+set chosenfile [lindex [.searchName.tree item $indices -values] 0]
+set chosenfile [addprefix_to_chosenfile $chosenfile]
+lmdInfo  $chosenfile
+}
+
+proc addprefix_to_chosenfile {chosenfile} {
+#need to add these prefixes so we can find it in midicapsIndex.
+set mid .mid
+set chosenfile [string trim $chosenfile \"]
+set chosenfile "lmd_full/[string index $chosenfile 0]/$chosenfile$mid"
+return $chosenfile
+}
+
+
 proc getFileInfo_from_md5 {inFileName} {
 global fileInfoPosition
 global midilist
@@ -17146,7 +17203,6 @@ global midi
 set inhandle [open [file join $midi(rootfolder) lmd_full "md5_to_paths.json"] "r"]
 set position [dict get $fileInfoPosition $inFileName]
 set midilist [list]
-puts "$position for $inFileName"
 seek $inhandle $position
 set line [gets $inhandle]
 while {[string first "\]," $line] < 3} {
