@@ -5,7 +5,7 @@
 exec wish8.6 "$0" "$@"
 
 global lmdexplorer_version
-set lmdexplorer_version "lmdExplorer version 0.403 2025-06-04 20:37" 
+set lmdexplorer_version "lmdExplorer version 0.405 2025-06-09 15:42" 
 set briefconsole 1
 
 # Copyright (C) 2019-2025 Seymour Shlien
@@ -566,6 +566,7 @@ proc setupMidiexplorer {} {
 # will create midiexplorer_home in the user's directory if
 # it does not already exist and cd to that folder.
 global env
+global midiexplorerpath
 if {[info exist env(MIDIEXPLORERPATH)]} {
      set midiexplorerpath [file join $env(MIDIEXPLORER) midiexplorer_home]
      #puts "MIDIEXPLORER = $midiexplorerpath"
@@ -2133,16 +2134,14 @@ proc selected_midi {chosenMidi} {
 
 
 proc load_last_midi_file {} {
+  global midi
  .lmdfeatures.menuline.view configure -state normal
  .lmdfeatures.menuline.play configure -state normal
  .lmdfeatures.menuline.rhythm configure -state normal
  .lmdfeatures.menuline.pitch configure -state normal
  .lmdfeatures.menuline.abc configure -state normal
  .lmdfeatures.menuline.display configure -state normal
- set midi_info [get_midi_info_for]
- if {$midi_info == ""} return
- parse_midi_info $midi_info
- presentMidiInfo
+  lmdInfo  $midi(midifilein)
 } 
 
 bind . <Control-m> load_last_midi_file
@@ -7881,21 +7880,14 @@ proc create_midi_file {} {
 
 proc mftext_local_analysis {} {
     global midi
-    set cmd "exec [list $midi(path_midi2abc)] $midi(outfilename) -mftext"
+    #set cmd "exec [list $midi(path_midi2abc)] $midi(outfilename) -mftext"
     mftextwindow $midi(outfilename) 1
 }
 
-proc mftext_tmp_midi {} {
-    global midi
-    midi_to_midi 1
-    set cmd "exec [list $midi(path_midi2abc)] $midi(outfilename) -mftext"
-    mftextwindow $midi(outfilename) 1
-}
 
 proc mftext_tmp {} {
 # for testing. use <Control-T>
     global midi
-    set cmd "exec [list $midi(path_midi2abc)] $midi(outfilename) -mftext"
     output_mftext $midi(outfilename) 
 }
 
@@ -10766,18 +10758,26 @@ set hlp_mftext "mftext window\n\n\
 
 proc mftext_tmp_midi {} {
     global midi
-    midi_to_midi 1
+    copyMidiToTmp pianoroll
     mftextwindow $midi(outfilename) 1
     }
 
 proc mftextwindow {midifilein nofile} {
     global midi df
     global mfnotes mftouch mfcntl mfprog mfmeta
+    global exec_out
+    global midiexplorerpath
     set f .mftext
     set inputmidi [file join $midi(rootfolder) [list $midifilein]]
+    set exec_out "mftextwindow $inputmidi nofile=$nofile\n"
+    #puts "exec_out = $exec_out"
     if {[winfo exist $f]} {
       $f.fillab configure -text  $midifilein  
-      output_mftext $inputmidi 
+      if {$nofile} {
+       output_mftext [file join $midiexplorerpath tmp.mid]
+       } else {
+       output_mftext $inputmidi
+       }
       raise $f .
       return
       }
@@ -10820,11 +10820,10 @@ proc mftextwindow {midifilein nofile} {
     pack $f -side top -anchor w
 
     if {$nofile} {
-       pack forget .mftext.1
+       output_mftext [file join $midiexplorerpath tmp.mid]
        } else {
-       pack .mftext.1 -before .mftext.2 
+       output_mftext $inputmidi
        }
-    output_mftext $inputmidi
     bind .mftext <Control-T> mftext_tmp
     # note you need to hold down the shift key too
 }
@@ -10850,11 +10849,11 @@ proc output_mftext {midifilein} {
        set cmd "exec [list $midi(path_midi2abc)] $midifilein -mftextpulses"
     }
     catch {eval $cmd} mftextresults
-    set exec_out $mftextresults
+    append exec_out $cmd
     if {[string first "no such" $exec_out] >= 0} {abcmidi_no_such_error $midi(path_midi2abc)}
     update_console_page 
-    #$f delete 1.0 end
     set mflines [split $mftextresults \n]
+    #dump_header_of_list $mflines
     foreach line $mflines {
         tag_and_insert_mftext_line $line
     }
@@ -10865,6 +10864,12 @@ proc output_mftext {midifilein} {
       
 }
 
+proc dump_header_of_list {inlist} {
+puts "\n"
+for {set i 0} {$i < 5} {incr i} {
+  puts [lindex $inlist $i]
+  }
+}
 
 proc tag_and_insert_mftext_line {line} {
     global df
