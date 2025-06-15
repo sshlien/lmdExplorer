@@ -5,7 +5,7 @@
 exec wish8.6 "$0" "$@"
 
 global lmdexplorer_version
-set lmdexplorer_version "lmdExplorer version 0.405 2025-06-09 15:42" 
+set lmdexplorer_version "lmdExplorer version 0.410 2025-06-15 15:55" 
 set briefconsole 1
 
 # Copyright (C) 2019-2025 Seymour Shlien
@@ -16936,7 +16936,7 @@ bind all <Alt-d> {drumgroove_window
 proc midicaps_window {}  {
 global midiDescriptor
 global df
-set selectedKeys {location  genre genre_prob mood mood_prob key time_signature tempo tempo_word  duration duration_word chord_summary all_chords all_chords_timestamps test_set}
+set selectedKeys {location  genre genre_prob mood mood_prob key time_signature tempo tempo_word  duration duration_word chord_summary test_set}
 set p .midicaps
 set f .lmdfeatures.f
 if  {![winfo exist .lmdfeatures.t]} {
@@ -16958,6 +16958,9 @@ if  {![winfo exist .lmdfeatures.t]} {
    pack .lmdfeatures.f2.$i -side left
    incr i
    }
+   button .lmdfeatures.f2.$i -text "All chords" -font $df -command allchords_window
+   pack .lmdfeatures.f2.$i -side left
+   
   # create text window for key values 
   text .lmdfeatures.t -wrap word 
   pack .lmdfeatures.t -expand yes -fill x 
@@ -16988,6 +16991,7 @@ proc dump_midicaps_index {} {
   }
 
 
+
 proc load_midicaps_index {} {
 global midicapsPosition
 global filelist
@@ -17005,7 +17009,12 @@ proc make_midicaps_index {} {
 global midicapsPosition
 global jsonName
 global midi
-set inhandle [open [file join $midi(rootfolder) lmd_full $jsonName] "r"]
+set inputfile [file join $midi(rootfolder) lmd_full $jsonName]
+if {![file exist $inputfile]} {
+  tk_messageBox -message  "You need to put the file $jsonName in the lmd_full folder. You can get this file from https://sourceforge.net/projects/lmdexplorer/files/. (You will need to unzip it.)"
+  return
+  }
+set inhandle [open $inputfile "r"]
 set i 0
 set position 0
 while {[eof $inhandle] != 1} {
@@ -17032,6 +17041,7 @@ while {[eof $inhandle] != 1} {
     }
   }
 close $inhandle
+dump_midicaps_index 
 }
 
 
@@ -17059,7 +17069,12 @@ proc make_md5Index {} {
 global fileInfoPosition
 global filelist
 global midi
-set inhandle [open [file join $midi(rootfolder) lmd_full "md5_to_paths.json"] "r"]
+set inputfile [file join $midi(rootfolder) lmd_full "md5_to_paths.json"]
+if {![file exist $inputfile]} {
+    tk_messageBox -message "You need to put md5_to_paths.json in the lmd_full folder. You can get this file from https://colinraffel.com/projects/lmd/" -type ok
+    return
+    }
+set inhandle [open $inputfile "r"]
 set outhandle [open "md5Index.txt" "w"]
 set i 0
 list filelist
@@ -17233,7 +17248,6 @@ if {$filelistLength < 1} {
     set from [clock seconds]
     make_midicaps_index 
     puts "elapsed time = [expr [clock seconds] - $from]"
-    dump_midicaps_index 
     }
   load_midicaps_index
   set filelistLength [llength $filelist]
@@ -17294,11 +17308,56 @@ set inFile [string range $chosenMidi 11 end-4]
 getFileInfo_from_md5 $inFile
 selected_midi $chosenMidi
 set midi_info [get_midi_info_for]
-#parse_midi_info $midi_info 
 
 set midi(midifilein) $chosenMidi
 activate_menu_items
 }
+
+### development
+set hlp_allchords "All chords
+
+The midicaps allchords and their timestamps values are listed here.\
+The timestamps were converted from seconds to beat number\
+based on the tempo value so that you can compare this output with\
+that of pitch analysis/chordtext.
+"
+
+proc allchords_window {} {
+   global df
+
+   if {[winfo exist .allchords] == 0} {
+     set f .allchords
+     toplevel $f 
+     #positionWindow $f
+     frame $f.1 
+     button $f.1.help -text help -font $df -command {show_message_page $hlp_allchords word}
+     pack $f.1.help  -anchor w
+     frame $f.2
+     pack $f.1 $f.2 -side top -anchor w
+     text $f.2.txt -yscrollcommand {.allchords.2.scroll set} -width 20 -font $df
+     scrollbar .allchords.2.scroll -orient vertical -command {.allchords.2.txt yview}
+     pack $f.2.txt $f.2.scroll -side left -fill y
+     }
+   #determineChordSequence $source 1
+   show_chord_timestamps
+}
+
+proc show_chord_timestamps {} {
+global midiDescriptor
+set v .allchords.2.txt
+$v delete 0.0 end
+    
+set tempo [dict get $midiDescriptor tempo]
+set timestamps [dict get $midiDescriptor all_chords_timestamps]
+set chords [dict get $midiDescriptor all_chords]
+set seconds2beat [expr $tempo/60.0]
+
+foreach stamp $timestamps chord $chords {
+  $v insert insert "[format %6.2f [expr $stamp*$seconds2beat]] $chord\n"
+  }
+}
+
+
 
 midicaps_window
 if {$argc != 0} {
