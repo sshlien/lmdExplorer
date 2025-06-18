@@ -5,7 +5,7 @@
 exec wish8.6 "$0" "$@"
 
 global lmdexplorer_version
-set lmdexplorer_version "lmdExplorer version 0.410 2025-06-15 15:55" 
+set lmdexplorer_version "lmdExplorer version 0.418 2025-06-18 12:58" 
 set briefconsole 1
 
 # Copyright (C) 2019-2025 Seymour Shlien
@@ -995,7 +995,7 @@ package require Tk
 
 # .top contains both .lmdfeatures and .info
 positionWindow "."
-panedwindow .top -orient vertical -showhandle 1 -sashwidth 10 -sashrelief sunken -sashpad 4 -height 600
+panedwindow .top -orient vertical -showhandle 1 -sashwidth 10 -sashrelief sunken -sashpad 4 -height 500
 pack .top -expand 1 -fill both
 
 set systembackground [lindex [. configure -background] 3]
@@ -1591,8 +1591,15 @@ set midi(history_length) 0
 }
 
 
+proc destroyMessage {} {
+if {[winfo exists ._msg_]} {destroy ._msg_}
+}
+
+
+
 proc popMessage {text} {
   set b ._msg_
+  destroyMessage 
   if {![winfo exists $b]} {
     toplevel $b -class Tooltip
     wm overrideredirect $b 1
@@ -1737,7 +1744,7 @@ set idlist {}
 # join .lmdfeatures and .info in the panedwindow called .top
 frame .info 
 pack .info -anchor w 
-.top add .lmdfeatures -minsize 300
+.top add .lmdfeatures -minsize 200
 .top add .info -minsize 150 -stretch always
 
 proc presentInfoMessage {msg} {
@@ -1886,12 +1893,7 @@ proc interpretMidi {} {
   array unset programmod
 
 
-  label .info.input -text $midi(midifilein) 
-  label .info.inputnames  -font $df
-  label .info.inputlab -font $df -text names
-  button .info.next -text next -font $df -command next_inputfilename
-  button .info.tracks -text "$ntrks tracks" -font $df -command midiTable
-  label .info.ppqn -text "$ppqn pulses/beat" -font $df
+  destroyMessage
   button .info.help -text help -font $df -command {show_message_page $hlp_trackInfo w}
 
 #update_table_header
@@ -1904,44 +1906,61 @@ proc interpretMidi {} {
   set sf [keytosf $keysig]
   set keyInfo  "$keysig [sftotext $sf]"
   }
+  frame .info.f1
+  frame .info.f2
+  frame .info.f3
+  frame .info.f4
+  pack .info.f1 .info.f2 .info.f3 .info.f4 -side top -anchor w
+  label .info.f1.input -text $midi(midifilein) -font $df
+  pack .info.f1.input -side left -anchor w
+  label .info.f2.inputnames  -font $df
+  label .info.f2.inputlab -font $df -text names
+  button .info.f2.next -text next -font $df -command next_inputfilename
+  button .info.f3.tracks -text "$ntrks tracks" -font $df -command midiTable
+  label .info.f3.ppqn -text "$ppqn pulses/beat" -font $df
+  pack .info.f2.inputnames .info.f2.inputlab .info.f2.next -side left -anchor w
+  pack .info.f3.tracks .info.f3.ppqn -side left
+
   if {![info exist tempo]} {set tempo 120}
-  label .info.tempo -text "$tempo beats/minute  " -font $df
-  label .info.size -text "$lastbeat beats"  -font $df
-  button .info.keysig -text "key: $keyInfo" -font $df -relief ridge -command show_rmaj
-  label .info.timesig -text "time signature: $timesig" -font $df
-  label .info.ntimesig -text "$ntimesig time signatures" -font $df -fg darkblue
-  label .info.nkeysig -text "$nkeysig key signature " -font $df -fg darkblue
-  label .info.lyrics -text "Has lyrics" -fg darkblue -font $df
-  button .info.notQuantized -text "Not quantized" -fg darkblue -font $df -relief ridge -command {beat_graph none}
-  label .info.triplets -text "Has triplets" -fg darkblue -font $df
-  label .info.qnotes -text "Mainly quarter notes" -fg darkblue -font $df
-  button .info.dithered -text "Dithered quantization" -fg darkblue -font $df -relief ridge -command {beat_graph none}
-  button .info.cleanq -text "Clean quantization" -fg darkblue -font $df -relief ridge -command {beat_graph none}
-  button .info.progchanges -text "$programchanges Program changes" -fg darkblue -font $df -relief ridge -command midi_structure_display
-  label .info.tempochanges -text "$ntempos Tempo changes" -fg darkblue -font $df
-  label .info.error -text $midierror -fg red -font $df
+  label .info.f3.tempo -text "$tempo beats/minute  " -font $df
+  label .info.f3.size -text "$lastbeat beats"  -font $df
+  pack .info.f3.tempo .info.f3.size -side left
+
+  button .info.f4.keysig -text "key: $keyInfo" -font $df -relief ridge -command show_rmaj
+  label .info.f4.timesig -text "time signature: $timesig" -font $df
+  button .info.f4.ntimesig -text "$ntimesig time signatures" -font $df -fg darkblue  -command list_timesigmod
+  label .info.f4.nkeysig -text "$nkeysig key signature " -font $df -fg darkblue
+  label .info.f4.lyrics -text "Has lyrics" -fg darkblue -font $df
+  button .info.f3.notQuantized -text "Not quantized" -fg darkblue -font $df -relief ridge -command {beat_graph none}
+  label .info.f4.triplets -text "Has triplets" -fg darkblue -font $df
+  label .info.f4.qnotes -text "Mainly quarter notes" -fg darkblue -font $df
+  button .info.f3.dithered -text "Dithered quantization" -fg darkblue -font $df -relief ridge -command {beat_graph none}
+  button .info.f3.cleanq -text "Clean quantization" -fg darkblue -font $df -relief ridge -command {beat_graph none}
+  button .info.f4.progchanges -text "$programchanges Program changes" -fg darkblue -font $df -relief ridge -command midi_structure_display
+  button .info.f4.tempochanges -text "$ntempos Tempo changes" -fg darkblue -font $df -command list_tempomod
+  label .info.f4.error -text $midierror -fg red -font $df
 
   if {[string length $midierror]>0} {
-     grid .info.error -columnspan 5
+     #grid .info.error -columnspan 5
      }
-  grid .info.input -columnspan 5
-  grid .info.inputlab .info.next .info.inputnames 
-  grid .info.tracks .info.ppqn .info.size .info.help -sticky w
-  grid .info.tempo .info.timesig .info.keysig -sticky w
-  set gridcmd "grid "
-  if {$ntimesig > 1} {append gridcmd ".info.ntimesig "}
-  if {$nkeysig > 0} {append gridcmd ".info.nkeysig "}
-  if {$notQuantized > 0} {append gridcmd ".info.notQuantized "}
-  if {$cleanq > 0} {append gridcmd ".info.cleanq "}
-  if {$dithered > 0} {append gridcmd ".info.dithered "}
-  if {$hasLyrics > 0} {append gridcmd ".info.lyrics "}
-  if {$hasTriplets > 0} {append gridcmd ".info.triplets "}
-  if {$qnotes > 0} {append gridcmd ".info.qnotes "}
-  if {$programchanges > 0} {append gridcmd ".info.progchanges "}
-  if {$ntempos > 1} {append gridcmd ".info.tempochanges "}
-  if {[string length $gridcmd] > 6} {
-    append gridcmd "-sticky w"
-    eval $gridcmd
+#  grid .info.input -columnspan 5
+#  grid .info.inputlab .info.next .info.inputnames 
+#  grid .info.tracks .info.ppqn .info.size .info.help -sticky w
+#  grid .info.tempo .info.timesig .info.keysig -sticky w
+  set packcmd "pack "
+  if {$ntimesig > 1} {append packcmd ".info.f4.ntimesig "}
+  if {$nkeysig > 0} {append packcmd ".info.f4.nkeysig "}
+  if {$notQuantized > 0} {append packcmd ".info.f3.notQuantized "}
+  if {$cleanq > 0} {append packcmd ".info.f3.cleanq "}
+  if {$dithered > 0} {append packcmd ".info.f3.dithered "}
+  if {$hasLyrics > 0} {append packcmd ".info.f4.lyrics "}
+  if {$hasTriplets > 0} {append packcmd ".info.f4.triplets "}
+  if {$qnotes > 0} {append packcmd ".info.f4.qnotes "}
+  if {$programchanges > 0} {append packcmd ".info.f4.progchanges "}
+  if {$ntempos > 1} {append packcmd ".info.f4.tempochanges "}
+  if {[string length $packcmd] > 6} {
+    append packcmd "-side left"
+    eval $packcmd
     }
   set_inputfilenames
 }
@@ -1951,8 +1970,8 @@ global midilist
 global midilistIndex
 global df
 set length [llength $midilist]
-.info.inputnames configure -text [lindex $midilist $midilistIndex] -font $df
-.info.inputlab configure -text "name: [expr $midilistIndex+1]/$length"
+.info.f2.inputnames configure -text [lindex $midilist $midilistIndex] -font $df
+.info.f2.inputlab configure -text "name: [expr $midilistIndex+1]/$length"
 #puts $midilist
 }
 
@@ -2234,10 +2253,12 @@ global keysf
 global keyconfidence
 global ntimesig
 global timesig
+global timesigmod
 global chanvol
 global programchanges
 global tempo
 global ntempos
+global tempomod
 global rmin
 global rmaj
 array unset xchannel2program
@@ -2258,6 +2279,9 @@ set rmin 0
 set rmaj 0
 
 set timesig 4/4
+set timesigmod [list]
+set tempomod [list]
+
 if {[info exist tempo]} {unset tempo}
 #array unset progr
 set rootfolder $midi(rootfolder)
@@ -2287,6 +2311,9 @@ foreach line [split $midi_info '\n'] {
             set lastbeat [expr $lastpulse/$ppqn]
             }
     tempo {set tempo [lindex $line 1]}
+    ctempo {set tempo [lindex $line 1]
+            update_tempomod [lindex $line 1] [lindex $line 2]
+           }
     tempocmds {set ntempos [lindex $line 1]}
     key {set keysig [lindex $line 1]
          set keysf [lindex $line 2]
@@ -2310,7 +2337,10 @@ foreach line [split $midi_info '\n'] {
     progsact {set cprogsact [lrange $line 1 end]}
     chanvol {set chanvol [lrange $line 1 end]}
     timesig {set value [lindex $line 1]
-             if {$timesig != $value} {incr ntimesig}
+             if {$timesig != $value} {
+               incr ntimesig
+               update_timesigmod $timesig [lindex $line 2]
+               }
              set timesig $value
              }
     rmin {set rmin [lrange $line 1 end]}
@@ -2362,6 +2392,19 @@ proc update_tempomod {tempo beat} {
   lappend tempomod [list $tempo $beat]
   }
 
+
+proc update_timesigmod {timesig beat} {
+  global timesigmod
+  lappend timesigmod [list $timesig $beat]
+  }
+
+proc update_keysigmod {keysig beat} {
+  global keysigmod
+  lappend keysigmod [list $keysig $beat]
+  }
+
+
+
 proc program_mod {c beat} {
   global programmod
   if {![info exist programmod($c)]} {return -1}
@@ -2405,8 +2448,20 @@ proc list_tempomod {} {
     }
   popMessage $msg
   }  
-  
  
+proc list_timesigmod {} {
+  global timesigmod
+  set msg ""
+  append msg "timesig\tbeat number\n"
+  foreach timesigcmd $timesigmod {
+    set t [lindex $timesigcmd 0]
+    set b [lindex $timesigcmd 1]
+    append msg "$t\t$b\n"
+    }
+  popMessage $msg
+  }
+ 
+
 
 
 proc get_trkinfo {channel prog  nnotes nharmony pmean pmin pmax prng duration durmin durmax pitchbendCount cntlparamCount pressureCount quietTime rhythmpatterns ngaps pitchEntropy nzeros nsteps njumps line} {
@@ -4273,8 +4328,8 @@ proc check_midi2abc_midistats_and_midicopy_versions {} {
     set msg ""
     set result [getVersionNumber $midi(path_midi2abc)]
     set err [scan $result "%f" ver]
-    if {$err == 0 || $ver < 3.59} {
-         appendInfoError "You need midi2abc.exe version 3.57"
+    if {$err == 0 || $ver < 3.64} {
+         appendInfoError "You need midi2abc.exe version 3.64"
          }
     set result [getVersionNumber $midi(path_midicopy)]
     set err [scan $result "%f" ver]
@@ -4284,8 +4339,8 @@ proc check_midi2abc_midistats_and_midicopy_versions {} {
                     }
     set result [getVersionNumber $midi(path_midistats)]
     set err [scan $result "%f" ver]
-    if {$err == 0 || $ver < 0.98} {
-         appendInfoError "You need midistats.exe version 0.98 or higher."
+    if {$err == 0 || $ver < 0.99} {
+         appendInfoError "You need midistats.exe version 0.99 or higher."
          }
     return pass
 }
@@ -15201,9 +15256,9 @@ proc show_data_page {text wrapmode clean} {
 
 
 set abcmidilist {path_abc2midi 5.02\
-            path_midi2abc 3.63\
+            path_midi2abc 3.64\
             path_midicopy 1.40\
-	    path_midistats 0.98\
+	    path_midistats 0.99\
             path_abcm2ps 8.14.6}
 
 
