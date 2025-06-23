@@ -5,7 +5,7 @@
 exec wish8.6 "$0" "$@"
 
 global lmdexplorer_version
-set lmdexplorer_version "lmdExplorer version 0.418 2025-06-18 12:58" 
+set lmdexplorer_version "lmdExplorer version 0.431 2025-06-23 09:10" 
 set briefconsole 1
 
 # Copyright (C) 2019-2025 Seymour Shlien
@@ -1600,18 +1600,17 @@ if {[winfo exists ._msg_]} {destroy ._msg_}
 proc popMessage {text} {
   set b ._msg_
   destroyMessage 
-  if {![winfo exists $b]} {
-    toplevel $b -class Tooltip
-    wm overrideredirect $b 1
-    wm positionfrom $b program
-    set xy [winfo pointerxy .]
-    set x [lindex $xy 0]
-    set y [lindex $xy 1]
-    wm geometry $b +$x+$y
-    label $b.label -highlightthickness 0 -relief solid -bd 1 \
-      -background lightyellow -fg black -justify left -text $text
-    pack $b.label -ipadx 1
-    }
+  toplevel $b -class Tooltip
+  wm overrideredirect $b 1
+  wm positionfrom $b program
+  set xy [winfo pointerxy .]
+  set x [lindex $xy 0]
+  set y [lindex $xy 1]
+  wm geometry $b +$x+$y
+  label $b.label -highlightthickness 0 -relief solid -bd 1 \
+    -background lightyellow -fg black -justify left -text $text
+  pack $b.label -ipadx 1
+  bind $b <ButtonPress-1> destroyMessage
 }
 
 
@@ -1866,7 +1865,6 @@ proc interpretMidi {} {
   global rmaj
   global ppqn
   global lastbeat
-  global programmod
   global addendum
   global miditxt
   global midierror
@@ -1890,7 +1888,6 @@ proc interpretMidi {} {
   array unset miditxt 
   array unset channel2program
   array unset track2program
-  array unset programmod
 
 
   destroyMessage
@@ -1910,7 +1907,8 @@ proc interpretMidi {} {
   frame .info.f2
   frame .info.f3
   frame .info.f4
-  pack .info.f1 .info.f2 .info.f3 .info.f4 -side top -anchor w
+  frame .info.f5
+  pack .info.f1 .info.f2 .info.f3 .info.f4 .info.f5 -side top -anchor w
   label .info.f1.input -text $midi(midifilein) -font $df
   pack .info.f1.input -side left -anchor w
   label .info.f2.inputnames  -font $df
@@ -1936,17 +1934,14 @@ proc interpretMidi {} {
   label .info.f4.qnotes -text "Mainly quarter notes" -fg darkblue -font $df
   button .info.f3.dithered -text "Dithered quantization" -fg darkblue -font $df -relief ridge -command {beat_graph none}
   button .info.f3.cleanq -text "Clean quantization" -fg darkblue -font $df -relief ridge -command {beat_graph none}
-  button .info.f4.progchanges -text "$programchanges Program changes" -fg darkblue -font $df -relief ridge -command midi_structure_display
+  #button .info.f4.progchanges -text "$programchanges Program changes" -fg darkblue -font $df -relief ridge -command midi_structure_display
+  button .info.f4.progchanges -text "$programchanges Program changes" -fg darkblue -font $df -relief ridge -command list_programmod
   button .info.f4.tempochanges -text "$ntempos Tempo changes" -fg darkblue -font $df -command list_tempomod
-  label .info.f4.error -text $midierror -fg red -font $df
+  label .info.f5.error -text $midierror -fg red -font $df
 
   if {[string length $midierror]>0} {
-     #grid .info.error -columnspan 5
+     pack .info.f5.error -side left
      }
-#  grid .info.input -columnspan 5
-#  grid .info.inputlab .info.next .info.inputnames 
-#  grid .info.tracks .info.ppqn .info.size .info.help -sticky w
-#  grid .info.tempo .info.timesig .info.keysig -sticky w
   set packcmd "pack "
   if {$ntimesig > 1} {append packcmd ".info.f4.ntimesig "}
   if {$nkeysig > 0} {append packcmd ".info.f4.nkeysig "}
@@ -2261,6 +2256,7 @@ global ntempos
 global tempomod
 global rmin
 global rmaj
+global programmod
 array unset xchannel2program
 array unset trkinfo
 set midierror ""
@@ -2281,6 +2277,7 @@ set rmaj 0
 set timesig 4/4
 set timesigmod [list]
 set tempomod [list]
+set programmod [list]
 
 if {[info exist tempo]} {unset tempo}
 #array unset progr
@@ -2311,7 +2308,7 @@ foreach line [split $midi_info '\n'] {
             set lastbeat [expr $lastpulse/$ppqn]
             }
     tempo {set tempo [lindex $line 1]}
-    ctempo {set tempo [lindex $line 1]
+    ctempo {
             update_tempomod [lindex $line 1] [lindex $line 2]
            }
     tempocmds {set ntempos [lindex $line 1]}
@@ -2351,7 +2348,9 @@ foreach line [split $midi_info '\n'] {
     activetrack {set ntrks [lindex $line 1]
                  append midierror "only $ntrks valid tracks"}
     Lyrics {set hasLyrics 1}
-    programcmd {set programchanges [lindex $line 1]}
+    cprogram {set programchanges [lindex $line 1]
+                update_programmod $line
+               }
     unquantized {set notQuantized 1}
     triplets {set hasTriplets 1}
     qnotes {set qnotes 1}
@@ -2374,17 +2373,12 @@ foreach line [split $midi_info '\n'] {
  return 0
 }
 
-proc update_programmod {c p beat} {
+proc update_programmod {arglist} {
   global programmod
-  if {![info exist programmod($c)]}  {
-     set programmod($c) "[list $beat] [list $p]"
-      } else {
-      set beatlist [lindex $programmod($c) 0] 
-      lappend beatlist $beat
-      set proglist [lindex $programmod($c) 1]
-      lappend proglist $p
-      set programmod($c) [list $beatlist $proglist]
-      }
+  set c [lindex $arglist 1]
+  set p [lindex $arglist 2]
+  set beat [lindex $arglist 3]
+  lappend programmod [list $c $p $beat]
   }
 
 proc update_tempomod {tempo beat} {
@@ -2420,19 +2414,16 @@ proc program_mod {c beat} {
   return [lindex $proglist $index]
   }
 
-proc list_progammod {} {
+proc list_programmod {} {
   global programmod
-  global mlist
   set msg ""
-  append msg "channel\tbeat number\tprogram\n"
-  for {set i 0} {$i < 17} {incr i} {
-    if {[info exist programmod($i)] == 0} {continue}
-    set beatlist [lindex $programmod($i) 0]
-    set proglist [lindex $programmod($i) 1]
-    foreach b $beatlist p $proglist {
-      append msg "$i\t$b\t[lindex $mlist $p]\n"
-      }
-    }
+  append msg "channel\tbeat\tprogram\n"
+  foreach progchange $programmod {
+    set c [lindex $progchange 0]
+    set p [lindex $progchange 1]
+    set beat [lindex $progchange 2]
+    append msg "$c\t$beat\t$p\n"
+    } 
   popMessage $msg
   }
 
@@ -16998,21 +16989,14 @@ if  {![winfo exist .lmdfeatures.t]} {
   # create two rows of buttons for the selectedKeys
   label .lmdfeatures.midicaptext -text "MIDICAPS FACTORS" -font $df -width 50
   set i 0
-  set sk1 [lrange $selectedKeys 0 8]
-  set sk2 [lrange $selectedKeys 9 end]
-  frame .lmdfeatures.f1
+  #set sk2 [lrange $selectedKeys end end]
   frame .lmdfeatures.f2
-  pack .lmdfeatures.midicaptext .lmdfeatures.f1 .lmdfeatures.f2 -side top
-  foreach key $sk1 {
-   button .lmdfeatures.f1.$i -text $key -font $df -command "output_key_value $key"
-   pack .lmdfeatures.f1.$i -side left
-   incr i
-   }
-  foreach key $sk2 {
-   button .lmdfeatures.f2.$i -text $key -font $df -command "output_key_value $key"
-   pack .lmdfeatures.f2.$i -side left
-   incr i
-   }
+  pack .lmdfeatures.midicaptext  .lmdfeatures.f2 -side top
+  #foreach key $sk2 {
+  # button .lmdfeatures.f2.$i -text $key -font $df -command "output_key_value $key"
+  # pack .lmdfeatures.f2.$i -side left
+  # incr i
+  # }
    button .lmdfeatures.f2.$i -text "All chords" -font $df -command allchords_window
    pack .lmdfeatures.f2.$i -side left
    
@@ -17029,9 +17013,12 @@ if  {![winfo exist .lmdfeatures.t]} {
 proc output_key_value {key} {
 global midiDescriptor
 global df
-set textoutput "$key: [dict get $midiDescriptor $key]"
-.lmdfeatures.t insert end $textoutput
-.lmdfeatures.t insert end \n
+set selectedKeys {genre genre_prob mood mood_prob key time_signature tempo tempo_word  duration duration_word chord_summary}
+foreach key $selectedKeys {
+  set textoutput "$key: [dict get $midiDescriptor $key]"
+  .lmdfeatures.t insert end $textoutput
+  .lmdfeatures.t insert end \n
+  }
 } 
 
 proc dump_midicaps_index {} {
@@ -17250,6 +17237,7 @@ if {![winfo exist .searchName]} {
   pack $w.tree $w.vsb -side left  -fill both
   bind $w.tree <<TreeviewSelect>> {sinfoSelect}
   bind $w.f.ent <Return> "search_md5_to_paths Queda"
+  focus $w.f.ent
   }
 return
 }
@@ -17389,7 +17377,7 @@ proc allchords_window {} {
      pack $f.1.help  -anchor w
      frame $f.2
      pack $f.1 $f.2 -side top -anchor w
-     text $f.2.txt -yscrollcommand {.allchords.2.scroll set} -width 20 -font $df
+     text $f.2.txt -yscrollcommand {.allchords.2.scroll set} -width 24 -font $df
      scrollbar .allchords.2.scroll -orient vertical -command {.allchords.2.txt yview}
      pack $f.2.txt $f.2.scroll -side left -fill y
      }
@@ -17397,18 +17385,89 @@ proc allchords_window {} {
    show_chord_timestamps
 }
 
+proc convertBeat2Seconds {tempo} {
+global tempomod
+global beat2seconds
+global lastbeat
+set beat2seconds [list {0.0 0.0}]
+set seconds 0.0
+set lastbeatnumber 0
+set tempo [expr double($tempo)]
+if {[llength $tempomod] < 1} {
+   set seconds [expr $lastbeat*60.0/$tempo]
+   lappend beat2seconds [list $seconds $lastbeat]
+   return
+   } else { 
+   foreach t $tempomod {
+     set newtempo [expr double([lindex $t 0])]
+     set tempochange [expr abs($newtempo - $tempo)]
+     if {$tempochange < 0.1} continue
+     set beatnumber [lindex $t 1]
+     set timeincrement [expr ($beatnumber-$lastbeatnumber)*60.0/$tempo]
+     set seconds [expr $seconds + $timeincrement]
+     #puts "$tempo $newtempo $beatnumber $seconds"
+     #puts "$seconds $beatnumber"
+     lappend beat2seconds [list $seconds $beatnumber]
+     set tempo $newtempo
+     set lastbeatnumber $beatnumber
+     }
+  }
+}
+
+proc interpolate_sec_to_beat {sec i} {
+global beat2seconds
+set l [llength $beat2seconds]
+
+set i1 [expr $i + 1]
+#puts "sec = $sec beat2seconds $i1 = [lindex $beat2seconds $i1] for $i1"
+while {$sec > [lindex [lindex $beat2seconds $i1] 0]} {
+  #puts "sec = $sec compared to [lindex $beat2seconds $i1] for i1 $i1"
+  incr i 
+  set i1 [expr $i + 1]
+  if {$i >= $l} {return -2}
+  }
+while {$sec < [lindex [lindex $beat2seconds $i] 0]} {
+  puts "sec = $sec compared to [lindex $beat2seconds $i1] for 1 $i"
+  incr i
+  if {$i >= $l} {return -1}
+  }
+  
+set secbeat1 [lindex $beat2seconds $i]
+set t1 [lindex $secbeat1 0]
+set b1 [lindex $secbeat1 1]
+set j [expr $i + 1]
+set secbeat2 [lindex $beat2seconds $j]
+set t2 [lindex $secbeat2 0]
+set b2 [lindex $secbeat2 1]
+
+set f [expr ($sec - $t1) / ($t2 - $t1)]
+set beat [expr $b1 + ($b2 - $b1)*$f]
+return [list $beat $i]
+}
+
 proc show_chord_timestamps {} {
 global midiDescriptor
+global tempomod
+#puts "tempomod = $tempomod"
 set v .allchords.2.txt
 $v delete 0.0 end
     
 set tempo [dict get $midiDescriptor tempo]
+convertBeat2Seconds $tempo
 set timestamps [dict get $midiDescriptor all_chords_timestamps]
 set chords [dict get $midiDescriptor all_chords]
 set seconds2beat [expr $tempo/60.0]
+$v insert insert "seconds\tbeat\tchord\n"
 
+set i 0
 foreach stamp $timestamps chord $chords {
-  $v insert insert "[format %6.2f [expr $stamp*$seconds2beat]] $chord\n"
+  set result [interpolate_sec_to_beat $stamp $i] 
+  #puts "result for $stamp $i = $result"
+  set beat [format %4.2f [lindex $result 0]]
+  if {$beat < 0} break
+  set i [lindex $result 1]
+  set stamp [format %4.2f $stamp]
+  $v insert insert "$stamp\t$beat\t$chord\n"
   }
 }
 
