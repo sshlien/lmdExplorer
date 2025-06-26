@@ -5,7 +5,7 @@
 exec wish8.6 "$0" "$@"
 
 global lmdexplorer_version
-set lmdexplorer_version "lmdExplorer version 0.431 2025-06-23 09:10" 
+set lmdexplorer_version "lmdExplorer version 0.438 2025-06-25 20:35" 
 set briefconsole 1
 
 # Copyright (C) 2019-2025 Seymour Shlien
@@ -995,7 +995,7 @@ package require Tk
 
 # .top contains both .lmdfeatures and .info
 positionWindow "."
-panedwindow .top -orient vertical -showhandle 1 -sashwidth 10 -sashrelief sunken -sashpad 4 -height 500
+panedwindow .top -orient vertical -showhandle 1 -sashwidth 10 -sashrelief sunken -sashpad 4 -height 450
 pack .top -expand 1 -fill both
 
 set systembackground [lindex [. configure -background] 3]
@@ -1021,7 +1021,6 @@ $ww add command -label "root directory" -font $df -command {
     if {[info exist desc]} {unset desc}
     lmdInit
     }
-$ww add command -label "search for title" -font $df -command searchNameWindow
 $ww add command -label "reload last midi file" -font $df -command load_last_midi_file -accelerator "ctrl-m"
 
 $ww add cascade -label "recent" -font $df -menu $ww.recent
@@ -1207,6 +1206,7 @@ menu $ww -tearoff 0
 	$ww add command -label chordgram -font $df -command {chordgram_plot none}
 	$ww add command -label "chord histogram" -font $df -command {chord_histogram .tinfo}
         $ww add command -label "chordtext" -font $df -command {chordtext_window .tinfo}
+        $ww add command -label "allchords" -font $df -command allchords_window
         $ww add command -label notegram -font $df -command {notegram_plot none}
         $ww add command -label keymap -font $df -command {keymap none}
 	$ww add command -label "entropy analysis" -font $df -command analyze_note_patterns
@@ -1254,8 +1254,9 @@ set ww $w.menuline.database.items
 menu $ww -tearoff 0
        $ww add command -label "create database" -font $df -command {make_midi_database}
 
-       $ww add command -label search -font $df -command {load_desc
-                                                  search_window
+       $ww add command -label search -font $df -command { search_window
+                                                  update
+                                                  load_desc
                                                  }
        $ww add command -label "defective files" -font $df -command find_bad_files
        $ww add cascade -label "export" -font $df -menu $ww.export
@@ -1320,7 +1321,11 @@ button $w.menuline.display -text display -font $df -command {create_abc_file non
 
 tooltip::tooltip .lmdfeatures.menuline.display "Display the music notation of the selected channels or tracks"
 
+button .lmdfeatures.menuline2.search -text "title search" -font $df -command searchNameWindow
+tooltip::tooltip .lmdfeatures.menuline2.search "Find a midi file based on a keyword in the file title."
+
 button .lmdfeatures.menuline2.random -text "random pick" -font $df -command {randomPick .lmdfeatures}
+tooltip::tooltip .lmdfeatures.menuline2.random "Open a random midi file."
 
 label .lmdfeatures.menuline2.transpose -text "transpose by"  -font $df
 tooltip::tooltip .lmdfeatures.menuline2.transpose "Number of semitones to transpose. It is restored
@@ -1399,7 +1404,7 @@ is still exposed when you exit midiexplorer.
 # pack everything and set binding to quick keys
 set ww $w.menuline
 pack $ww.file  $ww.view $ww.play $ww.display $ww.rhythm $ww.pitch  $ww.database $ww.abc $ww.settings $ww.internals $ww.help -anchor w -side left
-pack  .lmdfeatures.menuline2.random  .lmdfeatures.menuline2.transpose .lmdfeatures.menuline2.semi .lmdfeatures.menuline2.speed .lmdfeatures.menuline2.speedlabel -side left
+pack  .lmdfeatures.menuline2.search .lmdfeatures.menuline2.random  .lmdfeatures.menuline2.transpose .lmdfeatures.menuline2.semi .lmdfeatures.menuline2.speed .lmdfeatures.menuline2.speedlabel -side left
 pack .lmdfeatures.menuline -anchor w
 pack .lmdfeatures.menuline2 -anchor w
 
@@ -1743,7 +1748,7 @@ set idlist {}
 # join .lmdfeatures and .info in the panedwindow called .top
 frame .info 
 pack .info -anchor w 
-.top add .lmdfeatures -minsize 200
+.top add .lmdfeatures -minsize 180
 .top add .info -minsize 150 -stretch always
 
 proc presentInfoMessage {msg} {
@@ -1777,8 +1782,6 @@ global df
 label .info.msg$msgseq -text $msg -font $df -justify left
 grid .info.msg$msgseq -row $msgseq -sticky w
 incr msgseq
-#puts ".info config = [.top panecget .info -stretch]"
-#puts ".info sash = [.top proxy coord ]"
 }
 
 proc appendInfoError {msg} {
@@ -1924,19 +1927,18 @@ proc interpretMidi {} {
   label .info.f3.size -text "$lastbeat beats"  -font $df
   pack .info.f3.tempo .info.f3.size -side left
 
-  button .info.f4.keysig -text "key: $keyInfo" -font $df -relief ridge -command show_rmaj
+  button .info.f4.keysig -text "key: $keyInfo" -font $df -relief raised -command show_rmaj -bd 3
   label .info.f4.timesig -text "time signature: $timesig" -font $df
-  button .info.f4.ntimesig -text "$ntimesig time signatures" -font $df -fg darkblue  -command list_timesigmod
+  button .info.f4.ntimesig -text "$ntimesig time signatures" -font $df -fg darkblue  -command list_timesigmod -relief raised -bd 3
   label .info.f4.nkeysig -text "$nkeysig key signature " -font $df -fg darkblue
   label .info.f4.lyrics -text "Has lyrics" -fg darkblue -font $df
-  button .info.f3.notQuantized -text "Not quantized" -fg darkblue -font $df -relief ridge -command {beat_graph none}
+  button .info.f3.notQuantized -text "Not quantized" -fg darkblue -font $df -relief raised -command {beat_graph none} -bd 3
   label .info.f4.triplets -text "Has triplets" -fg darkblue -font $df
   label .info.f4.qnotes -text "Mainly quarter notes" -fg darkblue -font $df
-  button .info.f3.dithered -text "Dithered quantization" -fg darkblue -font $df -relief ridge -command {beat_graph none}
-  button .info.f3.cleanq -text "Clean quantization" -fg darkblue -font $df -relief ridge -command {beat_graph none}
-  #button .info.f4.progchanges -text "$programchanges Program changes" -fg darkblue -font $df -relief ridge -command midi_structure_display
-  button .info.f4.progchanges -text "$programchanges Program changes" -fg darkblue -font $df -relief ridge -command list_programmod
-  button .info.f4.tempochanges -text "$ntempos Tempo changes" -fg darkblue -font $df -command list_tempomod
+  button .info.f3.dithered -text "Dithered quantization" -fg darkblue -font $df -relief raised -command {beat_graph none} -bd 3
+  button .info.f3.cleanq -text "Clean quantization" -fg darkblue -font $df -relief raised -command {beat_graph none} -bd 3
+  button .info.f4.progchanges -text "$programchanges Program changes" -fg darkblue -font $df -relief raised -command list_programmod -bd 3
+  button .info.f4.tempochanges -text "$ntempos Tempo changes" -fg darkblue -font $df -command list_tempomod -relief raised -bd 3
   label .info.f5.error -text $midierror -fg red -font $df
 
   if {[string length $midierror]>0} {
@@ -2281,15 +2283,7 @@ set programmod [list]
 
 if {[info exist tempo]} {unset tempo}
 #array unset progr
-set rootfolder $midi(rootfolder)
-set rootfolderbytes [string length $rootfolder]
-incr rootfolderbytes
-set compactMidifile [string range $midi(midifilein) $rootfolderbytes end]
-if {[string length $compactMidifile] > 40} {
-   set a [string range $compactMidifile 0 40]
-   set b [string range $compactMidifile 40 end]
-   set compactMidifile $a\n$b
-   }
+set compactMidifile [string range $midi(midifilein) end-35 end]
 foreach line [split $midi_info '\n'] {
   #puts $line
   set trk 0
@@ -4985,7 +4979,7 @@ proc beat_graph {source} {
     }
     set ypos [expr $ytbx + 15]
     set xpos [expr $xlbx + 10]
-    $bgraph create text $xpos $ypos -text $compactMidifile  -anchor w -font $df
+    $bgraph create text $xpos $ypos -text $compactMidifile  -anchor w 
 }
 
 
@@ -11101,7 +11095,6 @@ close $outhandle
 destroy .status.progress
 destroy .status.abort
 destroy .status
-#load_desc
 }
   
 proc abortDatabaseCreation {} {
@@ -11241,6 +11234,7 @@ if {[array exist desc]} return
 set infile [file join $midi(rootfolder) lmd_full MidiDescriptors.txt]
 clearInfoMessages
 appendInfoMessage "Looking for $infile"
+update
 if {![file exist $infile]} {
    appendInfoError "First create database"
    return
@@ -16986,19 +16980,6 @@ set selectedKeys {location  genre genre_prob mood mood_prob key time_signature t
 set p .midicaps
 set f .lmdfeatures.f
 if  {![winfo exist .lmdfeatures.t]} {
-  # create two rows of buttons for the selectedKeys
-  label .lmdfeatures.midicaptext -text "MIDICAPS FACTORS" -font $df -width 50
-  set i 0
-  #set sk2 [lrange $selectedKeys end end]
-  frame .lmdfeatures.f2
-  pack .lmdfeatures.midicaptext  .lmdfeatures.f2 -side top
-  #foreach key $sk2 {
-  # button .lmdfeatures.f2.$i -text $key -font $df -command "output_key_value $key"
-  # pack .lmdfeatures.f2.$i -side left
-  # incr i
-  # }
-   button .lmdfeatures.f2.$i -text "All chords" -font $df -command allchords_window
-   pack .lmdfeatures.f2.$i -side left
    
   # create text window for key values 
   text .lmdfeatures.t -wrap word 
