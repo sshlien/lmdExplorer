@@ -5,7 +5,7 @@
 exec wish8.6 "$0" "$@"
 
 global lmdexplorer_version
-set lmdexplorer_version "lmdExplorer version 0.438 2025-06-25 20:35" 
+set lmdexplorer_version "lmdExplorer version 0.440 2025-07-03 09:40" 
 set briefconsole 1
 
 # Copyright (C) 2019-2025 Seymour Shlien
@@ -17217,7 +17217,7 @@ if {![winfo exist .searchName]} {
   $w.tree column original -width 300
   pack $w.tree $w.vsb -side left  -fill both
   bind $w.tree <<TreeviewSelect>> {sinfoSelect}
-  bind $w.f.ent <Return> "search_md5_to_paths Queda"
+  bind $w.f.ent <Return> {search_md5_to_paths $midi(searchstring)}
   focus $w.f.ent
   }
 return
