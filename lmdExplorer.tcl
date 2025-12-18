@@ -5,7 +5,7 @@
 exec wish8.6 "$0" "$@"
 
 global lmdexplorer_version
-set lmdexplorer_version "lmdExplorer version 0.440 2025-07-03 09:40" 
+set lmdexplorer_version "lmdExplorer version 0.443 2025-12-18 07:45" 
 set briefconsole 1
 
 # Copyright (C) 2019-2025 Seymour Shlien
@@ -1125,6 +1125,8 @@ menubutton $w.menuline.view -text view -menu $w.menuline.view.items -font $df -s
 	    -command google_search 
 	$ww add command -label "google genre" -font $df -accelerator "ctrl-g"\
 	    -command "google_search genre"
+        $ww add command -label "google chord progression" -font $df \
+            -command "google_search \"chord progression\""
 	$ww add command -label "duckduckgo search" -font $df -accelerator "ctrl-u"\
 	    -command duckduckgo_search
         $ww add command -label "track info" -font $df -command midiTable
@@ -17140,13 +17142,12 @@ while {![eof $inhandle]} {
     if {[dict exists $midicapsPosition $fullFileName]} {set done 0}
     } else {
     regexp -all $FindQuoted $line haystack
-    if {$done == 0 &&[info exist haystack] && ([string first $needle [string tolower $haystack]] > 1)} {
-       #puts "inFileName = $inFileName haystack = $haystack"
+    if {$done == 0 &&[info exist haystack] && ([string first $needle [string tolower $haystack]] >= 0)} {
        .searchName.tree insert {} -1 -values [list $inFileName  $haystack]
        incr i
        }
        set done 1
-       #if {$i > 1000} break
+       #if {$i > 4} break
        }
   }
 #puts "adding $i file links"
@@ -17191,6 +17192,8 @@ that contains that string. Selecting one of those lines in the\
 listbox will automatically open that file.
 "
  
+ttk::style configure Treeview.Heading -font $df
+ttk::style configure Treeview -font $df
 
 proc searchNameWindow {} {
 global df
@@ -17211,10 +17214,16 @@ if {![winfo exist .searchName]} {
   #frame $w
   ttk::scrollbar $w.vsb -orient vertical -command "$w.tree yview"
   ttk::treeview $w.tree -columns {filename original}\
-      -height 10 -yscroll "$w.vsb set"
+      -height 10 -yscroll "$w.vsb set" -show headings\
+      -yscrollcommand {.searchName.vsb set}
+  $w.tree heading 0 -text "filename"
+  $w.tree heading 0 -command [list SortBy 0 1]
+  $w.tree heading 1 -text "original filename"
+  $w.tree heading 1 -command [list SortBy 1 1]
   $w.tree column \#0 -width 1
-  $w.tree column filename -width 200
+  $w.tree column filename -width 240
   $w.tree column original -width 300
+
   pack $w.tree $w.vsb -side left  -fill both
   bind $w.tree <<TreeviewSelect>> {sinfoSelect}
   bind $w.f.ent <Return> {search_md5_to_paths $midi(searchstring)}
@@ -17222,6 +17231,27 @@ if {![winfo exist .searchName]} {
   }
 return
 }
+
+proc SortBy {col direction} {
+    set data {}
+    foreach row [.searchName.tree children {}] {
+        lappend data [list [.searchName.tree set $row $col] $row]
+    }
+
+    set dir [expr {$direction ? "-decreasing" : "-increasing"}]
+    set r -1
+
+
+
+    # Now reshuffle the rows into the sorted order
+    foreach info [lsort -dictionary -index 0 $dir $data] {
+        .searchName.tree  move [lindex $info 1] {} [incr r]
+    }
+    # Switch the heading so that it will sort in the opposite direction
+    .searchName.tree heading $col -command [list SortBy  $col [expr {!$direction}]]
+
+}
+
 
 proc sinfoSelect {} {
 global midi
