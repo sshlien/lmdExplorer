@@ -5,7 +5,7 @@
 exec wish8.6 "$0" "$@"
 
 global lmdexplorer_version
-set lmdexplorer_version "lmdExplorer version 0.443 2025-12-18 07:45" 
+set lmdexplorer_version "lmdExplorer version 0.444 2026-06-09 11:09" 
 set briefconsole 1
 
 # Copyright (C) 2019-2025 Seymour Shlien
@@ -11021,6 +11021,7 @@ proc make_midi_database {} {
 global midi
 global tcl_platform
 global stopCreation
+global rootfolderbytes
 global filelist
 global filelistLength
 if {$tcl_platform(platform) == "windows"} {
@@ -11028,6 +11029,8 @@ if {$tcl_platform(platform) == "windows"} {
 } else {
    set miditype {*.mid *.MID *.kar *.KAR}
    }
+set rootfolder $midi(rootfolder)
+set rootfolderbytes [string length $rootfolder]
 set outfile [file join $midi(rootfolder) lmd_full  MidiDescriptors.txt]
 if {[file exist $outfile]} {
   set choice [tk_messageBox -type yesno -default no \
@@ -11065,7 +11068,7 @@ grid .status.progress .status.msg .status.abort
 .status.progress start
 set starttime [clock seconds]
 #fconfigure stdin -blocking 0 -buffering none
-puts $outhandle "database_version 11"
+puts $outhandle "database_version 12"
 
 foreach midifile $filelist {
   incr i
@@ -11107,6 +11110,8 @@ set stopCreation 1
 
 proc get_midi_features {midifile midi_info outhandle index} {
 global cprogsact
+global rootfolderbytes
+set compactMidiFile [string range $midifile $rootfolderbytes end]
 #global cprogs
 set cprogs {}
 set tempo 120.0
@@ -11149,7 +11154,7 @@ foreach line [split $midi_info '\n'] {
     Error: {
             #appendInfoMessage "Defective file $midifile"
             puts $outhandle "damaged midifile"
-            puts $outhandle "file  [list $midifile]"
+            puts $outhandle "file  [list $compactMidiFile]"
             return
            }
     }
@@ -11170,7 +11175,7 @@ set cprogs [lsort -unique -integer $cprogs]
 set pcolor [normalize_vectorlist $progcolor]
 set pitches [normalize_vectorlist $pitches]
 #puts "pcolor    = $pcolor"
-puts $outhandle "file  [list $midifile]"
+puts $outhandle "sfile  [list $compactMidiFile]"
 puts $outhandle "filesize [file size $midifile]"
 puts $outhandle "tempo $tempo"
 puts $outhandle "midilength $midilength"
@@ -11248,8 +11253,8 @@ gets $inhandle line
 if {[lindex $line 0] == "database_version"} {
   set version [lindex $line 1]
   }
-if {$version != 11} {
-  appendInfoError "You should rerun create database to get version 11"
+if {$version != 12} {
+  appendInfoError "You should rerun create database to get version 12"
   } 
 while {![eof $inhandle]} {
   gets $inhandle line
@@ -12238,8 +12243,9 @@ for {set i 1} {$i < $descsize} {incr i} {
   if {[filter_files $i] && rand() < $threshold} {
      incr j
      if {$j > 200} break
-     set midifile [dict get $desc($i) file]
-     set compactMidifile [string range $midifile $rootfolderbytes end]
+     set smidifile [dict get $desc($i) sfile]
+     set midifile $rootfolder$smidifile
+
      incr position
      if {[file exist $midifile]} {
        set size [file size $midifile]
@@ -12257,9 +12263,9 @@ for {set i 1} {$i < $descsize} {incr i} {
          } else { 
          }
       if {[info exist rcriterion]} {
-        .scanResults.f.list insert $position "$compactMidifile $size $rcriterion"
+        .scanResults.f.list insert $position "$smidifile $size $rcriterion"
       } else {
-        .scanResults.f.list insert $position "$compactMidifile $size"
+        .scanResults.f.list insert $position "$smidifile $size"
       }
 
       }
