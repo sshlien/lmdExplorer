@@ -1625,36 +1625,29 @@ proc popMessage {text} {
 
 
 
+
+# produced by Google copilot 2026.08.05
 proc rglob {dirlist globlist} {
         set result {}
         set recurse {}
         foreach dir $dirlist {
-                presentInfoMessage "working on $dir"
-                update
-                if ![file isdirectory $dir] {
+                if {![file isdirectory $dir]} {
                         return -code error "'$dir' is not a directory"
                 }
+                # 1. Find files matching the targeted patterns
                 foreach pattern $globlist {
                         lappend result {*}[glob -nocomplain -directory $dir -- $pattern]
                 }
-                foreach file [glob -nocomplain -directory $dir -- *] {
-                        set file [file join $dir $file]
-                        if [file isdirectory $file] {
-                                set fileTail [file tail $file]
-                                if {!($fileTail eq "." || $fileTail eq "..")} {
-                                        lappend recurse $file
-                                }
-                        }
-                }
+                # 2. Fast directory traversal: Let the OS filter subdirectories natively
+                # This bypasses the slow 'file isdirectory' loop entirely.
+                lappend recurse {*}[glob -nocomplain -directory $dir -types d -- *]
         }
+        # 3. Recurse into subdirectories
         if {[llength $recurse] > 0} {
                 lappend result {*}[rglob $recurse $globlist]
         }
         return $result
 }
-
-
-
 
 
 
