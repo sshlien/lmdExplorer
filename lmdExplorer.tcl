@@ -5,7 +5,7 @@
 exec wish8.6 "$0" "$@"
 
 global lmdexplorer_version
-set lmdexplorer_version "lmdExplorer version 0.444 2026-06-09 11:09" 
+set lmdexplorer_version "lmdExplorer version 0.445 2026-09-09 06:21" 
 set briefconsole 1
 
 # Copyright (C) 2019-2025 Seymour Shlien
@@ -16995,7 +16995,7 @@ if  {![winfo exist .lmdfeatures.t]} {
 proc output_key_value {key} {
 global midiDescriptor
 global df
-set selectedKeys {genre genre_prob mood mood_prob key time_signature tempo tempo_word  duration duration_word chord_summary}
+set selectedKeys {caption genre genre_prob mood mood_prob key time_signature tempo tempo_word  duration duration_word chord_summary}
 foreach key $selectedKeys {
   set textoutput "$key: [dict get $midiDescriptor $key]"
   .lmdfeatures.t insert end $textoutput
